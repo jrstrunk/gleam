@@ -1,0 +1,26 @@
+---
+source: compiler-core/src/type_/tests/warnings.rs
+assertion_line: 3104
+expression: "\nfn pure_add(n: Int, m: Int) -> Int { n + m }\n\npub fn main() {\n    let f = pure_add\n    f(1, 2)\n    Nil\n}\n"
+---
+----- SOURCE CODE
+
+fn pure_add(n: Int, m: Int) -> Int { n + m }
+
+pub fn main() {
+    let f = pure_add
+    f(1, 2)
+    Nil
+}
+
+
+----- WARNING
+warning: Unused value
+  ┌─ /src/warning/wrn.gleam:6:5
+  │
+6 │     f(1, 2)
+  │     ^^^^^^^ This value is never used
+
+This expression computes a value without any side effects, but then the
+value isn't used at all. You might want to assign it to a variable, or
+delete the expression entirely if it's not needed.

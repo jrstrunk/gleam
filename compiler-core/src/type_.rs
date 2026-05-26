@@ -16,7 +16,7 @@ use ecow::EcoString;
 pub use environment::*;
 pub use error::{Error, Problems, UnifyErrorSituation, Warning};
 pub(crate) use expression::ExprTyper;
-use expression::Purity;
+pub use expression::Purity;
 pub use fields::FieldMap;
 use hexpm::version::Version;
 pub use prelude::*;
@@ -97,9 +97,16 @@ pub enum Type {
 
     /// The type of a function. It takes arguments and returns a value.
     ///
+    /// `purity` records whether calling this function may have side effects.
+    /// It is propagated through type inference so that calls through local
+    /// bindings (e.g. `let f = io.println; f("hi")`) can still be classified
+    /// for the impure-call warning. Unification ignores this field: Gleam has
+    /// no surface syntax for declaring "this parameter must be pure", so two
+    /// `Type::Fn`s with different purities still unify.
     Fn {
         arguments: Vec<Arc<Type>>,
         return_: Arc<Type>,
+        purity: Purity,
     },
 
     /// A type variable. See the contained `TypeVar` enum for more information.
@@ -376,7 +383,11 @@ impl Type {
                     Arc::make_mut(element).generalise_custom_type_variant();
                 }
             }
-            Type::Fn { arguments, return_ } => {
+            Type::Fn {
+                arguments,
+                return_,
+                purity: _,
+            } => {
                 for argument in arguments {
                     Arc::make_mut(argument).generalise_custom_type_variant();
                 }
@@ -585,10 +596,15 @@ impl Type {
                 type_.as_ref().borrow().same_as_other_type(one)
             }
             (
-                Type::Fn { arguments, return_ },
+                Type::Fn {
+                    arguments,
+                    return_,
+                    purity: _,
+                },
                 Type::Fn {
                     arguments: other_arguments,
                     return_: other_return,
+                    purity: _,
                 },
             ) => {
                 arguments.len() == other_arguments.len()
@@ -1540,26 +1556,22 @@ impl ValueConstructor {
     /// function might not be.
     pub fn called_function_purity(&self) -> Purity {
         match &self.variant {
-            // If we call a module constant or local variable as a function, we
-            // no longer have enough information to determine its purity. For
-            // example:
+            // For local variables and module constants holding a function, the
+            // function's purity is carried on the `Type::Fn` itself: the type
+            // checker propagates it from the RHS at the binding site. Calling
+            // a let-bound or constant-bound function can therefore be
+            // classified just like a direct module-function call.
             //
-            // ```gleam
-            // const function1 = io.println
-            // const function2 = function.identity
-            //
-            // pub fn main() {
-            //   function1("Hello")
-            //   function2("Hello")
-            // }
-            // ```
-            //
-            // At this point, we don't have any information about the purity of
-            // the `function1` and `function2` functions, and must return
-            // `Purity::Unknown`. See the documentation for the `Purity` type
-            // for more information on why this is the case.
+            // If the type isn't a `Type::Fn` we're not statically calling a
+            // function (a type variable from an annotation, an invalid call
+            // site, etc.), so we fall back to `Unknown`.
             ValueConstructorVariant::LocalVariable { .. }
-            | ValueConstructorVariant::ModuleConstant { .. } => Purity::Unknown,
+            | ValueConstructorVariant::ModuleConstant { .. } => {
+                match collapse_links(self.type_.clone()).as_ref() {
+                    Type::Fn { purity, .. } => *purity,
+                    _ => Purity::Unknown,
+                }
+            }
 
             // Constructing records is always pure
             ValueConstructorVariant::Record { .. } => Purity::Pure,
@@ -1641,7 +1653,9 @@ fn unify_unbound_type(type_: &Type, own_id: u64) -> Result<(), UnifyError> {
             Ok(())
         }
 
-        Type::Fn { arguments, return_ } => {
+        Type::Fn {
+            arguments, return_, ..
+        } => {
             for argument in arguments {
                 unify_unbound_type(argument, own_id)?;
             }
@@ -1687,7 +1701,10 @@ fn match_fun_type(
         }
     }
 
-    if let Type::Fn { arguments, return_ } = type_.deref() {
+    if let Type::Fn {
+        arguments, return_, ..
+    } = type_.deref()
+    {
         return if arguments.len() != arity {
             Err(MatchFunTypeError::IncorrectArity {
                 expected: arguments.len(),
@@ -1735,12 +1752,17 @@ pub fn generalise(t: Arc<Type>) -> Arc<Type> {
             })
         }
 
-        Type::Fn { arguments, return_ } => fn_(
+        Type::Fn {
+            arguments,
+            return_,
+            purity,
+        } => fn_with_purity(
             arguments
                 .iter()
                 .map(|type_| generalise(type_.clone()))
                 .collect(),
             generalise(return_.clone()),
+            *purity,
         ),
 
         Type::Tuple { elements } => tuple(

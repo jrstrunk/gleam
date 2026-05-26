@@ -136,11 +136,20 @@ impl<'a, 'b, 'c> PipeTyper<'a, 'b, 'c> {
 
                     match fun.type_().fn_types() {
                         // Rewrite as right(..args)(left)
-                        Some((fn_arguments, _)) if fn_arguments.len() == arguments.len() => {
-                            // We are calling the return value of another function.
-                            // Without lifting purity tracking into the type system,
-                            // we have no idea whether it's pure or not!
-                            self.expr_typer.purity = self.expr_typer.purity.merge(Purity::Unknown);
+                        Some((fn_arguments, return_type))
+                            if fn_arguments.len() == arguments.len() =>
+                        {
+                            // We are calling the return value of another
+                            // function. The purity of that inner call is now
+                            // recorded on the returned `Type::Fn` itself, so
+                            // read it from there.
+                            let returned_fn_purity =
+                                match collapse_links(return_type).as_ref() {
+                                    Type::Fn { purity, .. } => *purity,
+                                    _ => Purity::Unknown,
+                                };
+                            self.expr_typer.purity =
+                                self.expr_typer.purity.merge(returned_fn_purity);
                             (
                                 PipelineAssignmentKind::FunctionCall,
                                 self.infer_apply_to_call_pipe(fun, arguments, location),

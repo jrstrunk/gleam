@@ -9,7 +9,7 @@ use crate::{
 };
 
 use super::{
-    ModuleInterface, Opaque, References, Type, TypeConstructor, TypeValueConstructor,
+    ModuleInterface, Opaque, Purity, References, Type, TypeConstructor, TypeValueConstructor,
     TypeValueConstructorField, TypeVar, TypeVariantConstructors, ValueConstructor,
     ValueConstructorVariant,
 };
@@ -157,8 +157,26 @@ pub fn tuple(elements: Vec<Arc<Type>>) -> Arc<Type> {
     Arc::new(Type::Tuple { elements })
 }
 
+/// Construct a `Type::Fn` whose purity is `Purity::Unknown`. This is the
+/// right default for type annotations, prelude scaffolding, and any site
+/// that doesn't know better — surface syntax can't express purity today.
+/// Call sites that do know the purity (anonymous-function inference, module
+/// function inference, type-rewrite passes that preserve purity from a
+/// source `Type::Fn`) should use `fn_with_purity` instead.
 pub fn fn_(arguments: Vec<Arc<Type>>, return_: Arc<Type>) -> Arc<Type> {
-    Arc::new(Type::Fn { return_, arguments })
+    fn_with_purity(arguments, return_, Purity::Unknown)
+}
+
+pub fn fn_with_purity(
+    arguments: Vec<Arc<Type>>,
+    return_: Arc<Type>,
+    purity: Purity,
+) -> Arc<Type> {
+    Arc::new(Type::Fn {
+        return_,
+        arguments,
+        purity,
+    })
 }
 
 pub fn named(

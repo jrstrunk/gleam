@@ -707,13 +707,16 @@ impl Environment<'_> {
             }
 
             Type::Fn {
-                arguments, return_, ..
-            } => fn_(
+                arguments,
+                return_,
+                purity,
+            } => fn_with_purity(
                 arguments
                     .iter()
                     .map(|type_| self.instantiate(type_.clone(), ids, hydrator))
                     .collect(),
                 self.instantiate(return_.clone(), ids, hydrator),
+                *purity,
             ),
 
             Type::Tuple { elements } => tuple(
@@ -1137,6 +1140,10 @@ pub fn unify(t1: Arc<Type>, t2: Arc<Type>) -> Result<(), UnifyError> {
         }
 
         (
+            // Unification ignores `purity` deliberately. Gleam has no syntax
+            // to declare "this parameter must be a pure function", so there
+            // is no user-visible obligation that variance would enforce.
+            // Purity is recorded on `Type::Fn` for warning analysis only.
             Type::Fn {
                 arguments: arguments1,
                 return_: return1,

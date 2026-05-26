@@ -1102,15 +1102,15 @@ impl<'a, 'b> ExprTyper<'a, 'b> {
                 return self.error_expr(location);
             }
         };
-        let arguments_types = arguments.iter().map(|a| a.type_.clone()).collect();
-        let type_ = fn_(arguments_types, body.last().type_());
-
         // Defining an anonymous function never panics.
         self.already_warned_for_unreachable_code = already_warned_for_unreachable_code;
         self.previous_panics = false;
 
         let function_purity = self.purity;
         self.purity = outer_purity;
+
+        let arguments_types = arguments.iter().map(|a| a.type_.clone()).collect();
+        let type_ = fn_with_purity(arguments_types, body.last().type_(), function_purity);
 
         TypedExpr::Fn {
             location,
@@ -3469,7 +3469,9 @@ impl<'a, 'b> ExprTyper<'a, 'b> {
         let record_type = record.type_();
         // The record constructor needs to be a function.
         let (arguments_types, return_type) = match constructor.type_().as_ref() {
-            Type::Fn { arguments, return_ } => (arguments.clone(), return_.clone()),
+            Type::Fn {
+                arguments, return_, ..
+            } => (arguments.clone(), return_.clone()),
             Type::Named { .. } | Type::Var { .. } | Type::Tuple { .. } => {
                 return Err(Error::RecordUpdateInvalidConstructor {
                     location: constructor.location(),
@@ -3996,7 +3998,9 @@ impl<'a, 'b> ExprTyper<'a, 'b> {
 
                 // Extract field types and return type from the instantiated constructor
                 let (field_types, expected_type) = match instantiated_constructor_type.as_ref() {
-                    Type::Fn { arguments, return_ } => (arguments.clone(), return_.clone()),
+                    Type::Fn {
+                        arguments, return_, ..
+                    } => (arguments.clone(), return_.clone()),
                     Type::Named { .. } | Type::Var { .. } | Type::Tuple { .. } => {
                         self.problems.error(Error::RecordUpdateInvalidConstructor {
                             location: constructor_location,

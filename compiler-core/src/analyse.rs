@@ -684,7 +684,7 @@ impl<'a, A> ModuleAnalyzer<'a, A> {
                 expr_typer.purity
             };
 
-            let type_ = fn_(arguments_types, return_type);
+            let type_ = fn_with_purity(arguments_types, return_type, purity);
             Ok((
                 type_,
                 body,
@@ -751,6 +751,20 @@ impl<'a, A> ModuleAnalyzer<'a, A> {
             self.problems.error(convert_unify_error(error, location));
         }
 
+        // The preregistered type was built from annotations before the body
+        // was analysed, so its purity defaulted to `Unknown`. Now that we
+        // know the function's body purity, rebuild it so that references to
+        // this function through a `Type::Fn` (e.g. `let f = this_function`)
+        // can read the right purity off the type.
+        let stored_type = match preregistered_type.as_ref() {
+            Type::Fn {
+                arguments,
+                return_,
+                purity: _,
+            } => fn_with_purity(arguments.clone(), return_.clone(), purity),
+            _ => preregistered_type.clone(),
+        };
+
         // Ensure that the current target has an implementation for the function.
         // This is done at the expression level while inferring the function body, but we do it again
         // here as externally implemented functions may not have a Gleam body.
@@ -792,7 +806,7 @@ impl<'a, A> ModuleAnalyzer<'a, A> {
         environment.insert_variable(
             name.clone(),
             variant,
-            preregistered_type.clone(),
+            stored_type,
             publicity,
             deprecation.clone(),
         );

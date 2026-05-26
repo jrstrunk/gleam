@@ -73,7 +73,9 @@ impl Printer {
                 }
             }
 
-            Type::Fn { arguments, return_ } => "fn("
+            Type::Fn {
+                arguments, return_, ..
+            } => "fn("
                 .to_doc()
                 .append(self.arguments_to_gleam_doc(arguments))
                 .append(") ->")
@@ -324,6 +326,7 @@ fn pretty_print_test() {
                 publicity: Publicity::Public,
                 inferred_variant: None,
             }),
+            purity: Purity::Unknown,
         },
         "fn(Int, Bool) -> Bool",
     );

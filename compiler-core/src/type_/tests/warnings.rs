@@ -3078,6 +3078,42 @@ pub fn main() {
     );
 }
 
+// Purity is now recorded on `Type::Fn`, so a let-bound impure module function
+// is correctly classified as impure when called. The discarded call site
+// should not be flagged as unused.
+#[test]
+fn impure_function_through_local_binding_not_marked_as_unused() {
+    assert_no_warnings!(
+        r#"
+fn impure(_n: Int) -> Nil { panic }
+
+pub fn main() {
+    let f = impure
+    f(1)
+    Nil
+}
+"#
+    );
+}
+
+// Conversely, a let-bound pure module function whose result is discarded now
+// warns about the unused pure value — previously the binding collapsed the
+// purity to `Unknown` and the call was treated as potentially impure.
+#[test]
+fn unused_pure_function_call_through_local_binding() {
+    assert_warning!(
+        r#"
+fn pure_add(n: Int, m: Int) -> Int { n + m }
+
+pub fn main() {
+    let f = pure_add
+    f(1, 2)
+    Nil
+}
+"#
+    );
+}
+
 #[test]
 fn unused_pipeline_ending_with_pure_fn() {
     assert_warning!(

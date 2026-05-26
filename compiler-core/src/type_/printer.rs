@@ -7,6 +7,8 @@ use crate::{
     ast::SrcSpan,
     type_::{Type, TypeAliasConstructor, TypeVar},
 };
+#[cfg(test)]
+use crate::type_::Purity;
 
 /// This class keeps track of what names are used for modules in the current
 /// scope, so they can be printed in errors, etc.
@@ -504,7 +506,9 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            Type::Fn { arguments, return_ } => {
+            Type::Fn {
+                arguments, return_, ..
+            } => {
                 buffer.push_str("fn(");
                 self.print_arguments(arguments, buffer, print_mode);
                 buffer.push_str(") -> ");
@@ -748,6 +752,7 @@ fn test_fn_type() {
             package: "".into(),
             inferred_variant: None,
         }),
+        purity: Purity::Unknown,
     };
 
     assert_eq!(printer.print_type(&type_), "fn(Int, gleam.String) -> Bool");

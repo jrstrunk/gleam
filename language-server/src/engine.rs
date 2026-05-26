@@ -1536,6 +1536,7 @@ fn get_function_type(fun: &TypedFunction) -> Type {
             .map(|argument| argument.type_.clone())
             .collect(),
         return_: fun.return_type.clone(),
+        purity: fun.purity,
     }
 }
 

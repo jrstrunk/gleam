@@ -1,0 +1,11 @@
+---
+source: test-commands/src/tests.rs
+assertion_line: 61
+expression: error
+---
+error: Program not found
+
+The program `escript` was not found. Is it installed?
+
+Documentation for installing Erlang can be viewed here:
+https://gleam.run/getting-started/installing/
