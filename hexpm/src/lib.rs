@@ -1142,7 +1142,7 @@ impl OAuthDeviceAuthorisation {
         &mut self,
         response: http::Response<Vec<u8>>,
     ) -> Result<PollStep, ApiError> {
-        if self.start_time.elapsed() > Duration::from_mins(10) {
+        if self.start_time.elapsed() > Duration::from_secs(10 * 60) {
             return Err(ApiError::OAuthTimeout);
         }
 

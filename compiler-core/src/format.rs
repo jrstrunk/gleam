@@ -1980,12 +1980,12 @@ impl<'comments> Formatter<'comments> {
             CallArgFormatting::Unlabelled(value) => format_value(self, value),
             CallArgFormatting::ShorthandLabelled(label) => {
                 let comments = self.pop_comments(argument.location.start);
-                let label = label.as_ref().to_doc().append(":");
+                let label = label.as_str().to_doc().append(":");
                 commented(label, comments)
             }
             CallArgFormatting::Labelled(label, value) => {
                 let comments = self.pop_comments(argument.location.start);
-                let label = label.as_ref().to_doc().append(": ");
+                let label = label.as_str().to_doc().append(": ");
                 let value = format_value(self, value);
                 commented(label, comments).append(value)
             }
